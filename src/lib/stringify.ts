@@ -5,7 +5,7 @@ import { JsonValueReadonly } from "./types";
  */
 export function jsonStringify(
   value: JsonValueReadonly,
-  config?: { pretty?: boolean },
+  config?: { indented?: boolean },
 ): string {
-  return JSON.stringify(value, null, config?.pretty ? 2 : undefined);
+  return JSON.stringify(value, null, config?.indented ? 2 : undefined);
 }

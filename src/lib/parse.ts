@@ -7,9 +7,9 @@ import { JsonArray, JsonObject, JsonValue } from "./types";
  */
 export function jsonParse(
   string: string,
-  config?: { strict?: boolean },
+  config?: { allowLenientSyntax?: boolean },
 ): JsonValue {
-  if (config?.strict) {
+  if (!config?.allowLenientSyntax) {
     return JSON.parse(string) as JsonValue;
   }
   const reader = new Reader(string);
