@@ -69,6 +69,27 @@ export const jsonValueAsNumberDecoder: JsonDecoder<number> = jsonVisitor({
   },
 });
 
+export const jsonValueAsBigIntDecoder: JsonDecoder<bigint> = jsonVisitor({
+  number: (number) => BigInt(number),
+  string: (string) => {
+    if (string.includes("_")) {
+      return BigInt(string.replace(/_/g, ""));
+    }
+    return BigInt(string);
+  },
+});
+
+export function jsonValueAsNullableDecoder<Content>(
+  contentDecoder: (encoded: Exclude<JsonValueReadonly, null>) => Content,
+): JsonDecoder<null | Content> {
+  return (encoded) => {
+    if (encoded === null) {
+      return null;
+    }
+    return contentDecoder(encoded);
+  };
+}
+
 export function jsonValueAsConstDecoder<
   const Values extends readonly JsonPrimitive[],
 >(...values: Values): JsonDecoder<Values[number]> {
@@ -81,16 +102,6 @@ export function jsonValueAsConstDecoder<
     jsonThrowWithExpected(values.map(jsonPreview).join("/"), encoded);
   };
 }
-
-export const jsonValueAsBigIntDecoder: JsonDecoder<bigint> = jsonVisitor({
-  number: (number) => BigInt(number),
-  string: (string) => {
-    if (string.includes("_")) {
-      return BigInt(string.replace(/_/g, ""));
-    }
-    return BigInt(string);
-  },
-});
 
 export const jsonNumberAsUnixDateDecoder: JsonDecoder<Date> = jsonVisitor({
   number: (number) => {
@@ -105,6 +116,14 @@ export const jsonNumberAsUnixDateDecoder: JsonDecoder<Date> = jsonVisitor({
   },
 });
 
+export function jsonNumberAsOpaqueDecoder<
+  const Opaque extends JsonNumberOpaque<any>,
+>(): JsonDecoder<Opaque> {
+  return jsonVisitor({
+    number: (number) => number as Opaque,
+  });
+}
+
 export const jsonStringAsIsoDateDecoder: JsonDecoder<Date> = jsonVisitor({
   string: (string) => {
     const date = new Date(string);
@@ -118,14 +137,6 @@ export const jsonStringAsIsoDateDecoder: JsonDecoder<Date> = jsonVisitor({
 export const jsonStringAsUrlDecoder: JsonDecoder<URL> = jsonVisitor({
   string: (string) => new URL(string),
 });
-
-export function jsonNumberAsOpaqueDecoder<
-  const Opaque extends JsonNumberOpaque<any>,
->(): JsonDecoder<Opaque> {
-  return jsonVisitor({
-    number: (number) => number as Opaque,
-  });
-}
 
 export function jsonStringAsOpaqueDecoder<
   const Opaque extends JsonStringOpaque<any>,
@@ -262,17 +273,6 @@ export function jsonObjectAsRecordDecoder<Value>(
       return decoded;
     },
   });
-}
-
-export function jsonValueAsNullableDecoder<Content>(
-  contentDecoder: (encoded: Exclude<JsonValueReadonly, null>) => Content,
-): JsonDecoder<null | Content> {
-  return (encoded) => {
-    if (encoded === null) {
-      return null;
-    }
-    return contentDecoder(encoded);
-  };
 }
 
 export function jsonValueAsOutputDecoder<Decoded, Encoded>(

@@ -68,6 +68,7 @@ export const jsonValueAsBooleanCodec: JsonCodec<boolean> = {
   decoder: jsonValueAsBooleanDecoder,
   encoder: (decoded) => decoded,
 };
+
 export const jsonValueAsNumberCodec: JsonCodec<number> = {
   decoder: jsonValueAsNumberDecoder,
   encoder: (decoded: number) => {
@@ -84,6 +85,25 @@ export const jsonValueAsNumberCodec: JsonCodec<number> = {
   },
 };
 
+export const jsonValueAsBigIntCodec: JsonCodec<bigint> = {
+  decoder: jsonValueAsBigIntDecoder,
+  encoder: (decoded) => decoded.toString(),
+};
+
+export function jsonValueAsNullableCodec<Content>(
+  contentCodec: JsonCodec<Exclude<Content, null>>,
+): JsonCodec<null | Content> {
+  return {
+    decoder: jsonValueAsNullableDecoder(contentCodec.decoder),
+    encoder: (decoded) => {
+      if (decoded === null) {
+        return null;
+      }
+      return contentCodec.encoder(decoded as Exclude<Content, null>);
+    },
+  };
+}
+
 export function jsonValueAsConstCodec<
   const Values extends readonly JsonPrimitive[],
 >(...values: Values): JsonCodec<Values[number]> {
@@ -92,11 +112,6 @@ export function jsonValueAsConstCodec<
     encoder: (decoded) => decoded,
   };
 }
-
-export const jsonValueAsBigIntCodec: JsonCodec<bigint> = {
-  decoder: jsonValueAsBigIntDecoder,
-  encoder: (decoded) => decoded.toString(),
-};
 
 export const jsonNumberAsUnixDateCodec: JsonCodec<Date> = {
   decoder: jsonNumberAsUnixDateDecoder,
@@ -257,20 +272,6 @@ export function jsonObjectAsRecordCodec<Value>(
         encoded[key] = valueEncoded;
       }
       return encoded;
-    },
-  };
-}
-
-export function jsonValueAsNullableCodec<Content>(
-  contentCodec: JsonCodec<Exclude<Content, null>>,
-): JsonCodec<null | Content> {
-  return {
-    decoder: jsonValueAsNullableDecoder(contentCodec.decoder),
-    encoder: (decoded) => {
-      if (decoded === null) {
-        return null;
-      }
-      return contentCodec.encoder(decoded as Exclude<Content, null>);
     },
   };
 }

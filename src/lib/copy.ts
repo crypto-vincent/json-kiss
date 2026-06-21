@@ -14,24 +14,21 @@ export function jsonArrayDeepCopy(array: JsonArrayReadonly): JsonArray {
 
 export function jsonObjectDeepCopy(object: JsonObjectReadonly): JsonObject {
   const copy: JsonObject = {};
-  for (const key in object) {
-    const value = object[key];
-    if (value !== undefined) {
-      copy[key] = jsonValueDeepCopy(value);
+  for (const objectKey in object) {
+    const objectValue = object[objectKey];
+    if (objectValue !== undefined) {
+      copy[objectKey] = jsonValueDeepCopy(objectValue);
     }
   }
   return copy;
 }
 
-export function jsonValueDeepCopy(value: JsonValueReadonly): JsonValue {
-  return visitor(value);
-}
-
-const visitor = jsonVisitor<JsonValue>({
-  null: () => null,
-  boolean: (value) => value,
-  number: (value) => value,
-  string: (value) => value,
-  array: (value) => jsonArrayDeepCopy(value),
-  object: (value) => jsonObjectDeepCopy(value),
-});
+export const jsonValueDeepCopy: (value: JsonValueReadonly) => JsonValue =
+  jsonVisitor<JsonValue>({
+    null: () => null,
+    boolean: (value) => value,
+    number: (value) => value,
+    string: (value) => value,
+    array: (value) => jsonArrayDeepCopy(value),
+    object: (value) => jsonObjectDeepCopy(value),
+  });
