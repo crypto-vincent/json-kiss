@@ -1,17 +1,13 @@
 import {
-  type JsonArrayReadonly,
-  type JsonNumberOpaque,
-  type JsonObjectReadonly,
-  type JsonPrimitive,
-  type JsonStringOpaque,
-  type JsonValueReadonly,
-} from "..";
+  jsonArrayDeepCopy,
+  jsonObjectDeepCopy,
+  jsonValueDeepCopy,
+} from "./copy";
 import {
   jsonArrayAsItemsDecoder,
   jsonArrayAsTupleDecoder,
   jsonArrayDecoder,
   jsonBooleanDecoder,
-  JsonDecoder,
   jsonNumberAsOpaqueDecoder,
   jsonNumberAsUnixDateDecoder,
   jsonNumberDecoder,
@@ -20,7 +16,6 @@ import {
   jsonObjectDecoder,
   jsonStringAsIsoDateDecoder,
   jsonStringAsOpaqueDecoder,
-  jsonStringAsPrefixedDecoder,
   jsonStringAsUrlDecoder,
   jsonStringDecoder,
   jsonValueAsBigIntDecoder,
@@ -31,23 +26,20 @@ import {
   jsonValueAsOutputDecoder,
   jsonValueDecoder,
 } from "./decode";
-
-export type JsonEncoder<Content> = (decoded: Content) => JsonValueReadonly;
-export type JsonCodec<Content> = {
-  decoder: JsonDecoder<Content>;
-  encoder: JsonEncoder<Content>;
-};
-
-export type JsonEncoderContent<Encoder> =
-  Encoder extends JsonEncoder<infer Content> ? Content : never;
-export type JsonCodecContent<Codec> =
-  Codec extends JsonCodec<infer Content> ? Content : never;
-export type JsonDecoderContent<Decoder> =
-  Decoder extends JsonDecoder<infer Content> ? Content : never;
+import {
+  JsonArray,
+  JsonCodec,
+  JsonNumberOpaque,
+  JsonObject,
+  JsonPrimitive,
+  JsonStringOpaque,
+  JsonValue,
+  JsonValueReadonly,
+} from "./types";
 
 export const jsonValueCodec: JsonCodec<JsonValueReadonly> = {
   decoder: jsonValueDecoder,
-  encoder: (decoded) => decoded,
+  encoder: jsonValueDeepCopy,
 };
 
 export const jsonBooleanCodec: JsonCodec<boolean> = {
@@ -63,13 +55,13 @@ export const jsonStringCodec: JsonCodec<string> = {
   encoder: (decoded) => decoded,
 };
 
-export const jsonArrayCodec: JsonCodec<JsonArrayReadonly> = {
+export const jsonArrayCodec: JsonCodec<JsonArray> = {
   decoder: jsonArrayDecoder,
-  encoder: (decoded) => decoded,
+  encoder: jsonArrayDeepCopy,
 };
-export const jsonObjectCodec: JsonCodec<JsonObjectReadonly> = {
+export const jsonObjectCodec: JsonCodec<JsonObject> = {
   decoder: jsonObjectDecoder,
-  encoder: (decoded) => decoded,
+  encoder: jsonObjectDeepCopy,
 };
 
 export const jsonValueAsBooleanCodec: JsonCodec<boolean> = {
@@ -93,7 +85,7 @@ export const jsonValueAsNumberCodec: JsonCodec<number> = {
 };
 
 export function jsonValueAsConstCodec<
-  const Values extends Array<JsonPrimitive>,
+  const Values extends readonly JsonPrimitive[],
 >(...values: Values): JsonCodec<Values[number]> {
   return {
     decoder: jsonValueAsConstDecoder(...values),
@@ -130,15 +122,6 @@ export const jsonStringAsUrlCodec: JsonCodec<URL> = {
   encoder: (decoded) => decoded.toString(),
 };
 
-export function jsonStringAsPrefixedCodec<const Prefix extends string>(
-  prefix: Prefix,
-): JsonCodec<`${Prefix}${string}`> {
-  return {
-    decoder: jsonStringAsPrefixedDecoder<Prefix>(prefix),
-    encoder: (decoded) => decoded,
-  };
-}
-
 export function jsonStringAsOpaqueCodec<
   const Opaque extends JsonStringOpaque<any>,
 >(): JsonCodec<Opaque> {
@@ -150,7 +133,7 @@ export function jsonStringAsOpaqueCodec<
 
 export function jsonArrayAsItemsCodec<Item>(
   itemsCodec: JsonCodec<Item>,
-): JsonCodec<Array<Item>> {
+): JsonCodec<Item[]> {
   return {
     decoder: jsonArrayAsItemsDecoder(itemsCodec.decoder),
     encoder: (decoded) => decoded.map(itemsCodec.encoder),
@@ -158,8 +141,8 @@ export function jsonArrayAsItemsCodec<Item>(
 }
 
 export function jsonArrayAsTupleCodec<
-  const RequiredItems extends Array<any> = [],
-  const OptionalItems extends Array<any> = [],
+  const RequiredItems extends readonly any[] = [],
+  const OptionalItems extends readonly any[] = [],
 >(
   requiredItemCodecs: {
     [K in keyof RequiredItems]: JsonCodec<RequiredItems[K]>;
@@ -179,7 +162,7 @@ export function jsonArrayAsTupleCodec<
       optionalItemCodecs.map((codec) => codec.decoder),
     ) as any,
     encoder: (decoded) => {
-      const encoded = new Array<JsonValueReadonly>(decoded.length);
+      const encoded = new Array<JsonValue>(decoded.length);
       let position = 0;
       for (const itemCodec of requiredItemCodecs) {
         const itemDecoded = decoded[position]!;
@@ -239,7 +222,7 @@ export function jsonObjectAsValuesCodec<
       optionalValueDecoders,
     ) as any,
     encoder: (decoded) => {
-      const encoded = {} as { [key: string]: JsonValueReadonly };
+      const encoded = {} as { [key: string]: JsonValue };
       for (const key in requiredValueCodecs) {
         const valueDecoded = decoded[key];
         const valueEncoder = requiredValueCodecs[key]!.encoder;
@@ -267,7 +250,7 @@ export function jsonObjectAsRecordCodec<Value>(
   return {
     decoder: jsonObjectAsRecordDecoder(valuesCodec.decoder),
     encoder: (decoded) => {
-      const encoded = {} as { [key: string]: JsonValueReadonly };
+      const encoded = {} as { [key: string]: JsonValue };
       for (const key in decoded) {
         const valueDecoded = decoded[key]!;
         const valueEncoded = valueEncoder(valueDecoded);

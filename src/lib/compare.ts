@@ -1,8 +1,4 @@
-import {
-  type JsonObjectReadonly,
-  type JsonValue,
-  type JsonValueReadonly,
-} from "..";
+import { JsonObjectReadonly, JsonValue, JsonValueReadonly } from "./types";
 
 /**
  * Returns `true` if two {@link JsonValue}s are deeply equal, or `false` otherwise.
@@ -11,8 +7,8 @@ import {
  * @returns `true` if the values are deeply equal, `false` otherwise.
  */
 export function jsonIsDeepEqual(
-  leftValue: JsonValue | JsonValueReadonly,
-  rightValue: JsonValue | JsonValueReadonly,
+  leftValue: JsonValueReadonly,
+  rightValue: JsonValueReadonly,
 ): boolean {
   if (leftValue === rightValue) {
     return true;
@@ -71,8 +67,8 @@ export function jsonIsDeepEqual(
  * @returns `true` if the first value is a deep subset of the second value, `false` otherwise.
  */
 export function jsonIsDeepSubset(
-  subsetValue: JsonValue | JsonValueReadonly,
-  supersetValue: JsonValue | JsonValueReadonly,
+  subsetValue: JsonValueReadonly,
+  supersetValue: JsonValueReadonly,
 ): boolean {
   if (subsetValue === supersetValue) {
     return true;

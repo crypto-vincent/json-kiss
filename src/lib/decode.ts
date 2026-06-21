@@ -1,92 +1,76 @@
 import {
-  type JsonArrayReadonly,
-  type JsonNumberOpaque,
-  type JsonObjectReadonly,
-  type JsonPrimitive,
-  type JsonStringOpaque,
-  type JsonValueReadonly,
-} from "..";
+  jsonArrayDeepCopy,
+  jsonObjectDeepCopy,
+  jsonValueDeepCopy,
+} from "./copy";
 import { jsonPreview } from "./preview";
 import { jsonThrowWithExpected } from "./throw";
+import {
+  JsonArray,
+  JsonDecoder,
+  JsonNumberOpaque,
+  JsonObject,
+  JsonPrimitive,
+  JsonStringOpaque,
+  JsonValue,
+  JsonValueReadonly,
+} from "./types";
 import { jsonVisitor } from "./visitor";
 
-export type JsonDecoder<Content> = (encoded: JsonValueReadonly) => Content;
+export const jsonValueDecoder: JsonDecoder<JsonValue> = jsonValueDeepCopy;
 
-export function jsonValueByKindDecoder<Content>(decoders: {
-  null?: (value: null) => Content;
-  boolean?: (value: boolean) => Content;
-  number?: (value: number) => Content;
-  string?: (value: string) => Content;
-  array?: (value: JsonArrayReadonly) => Content;
-  object?: (value: JsonObjectReadonly) => Content;
-}): JsonDecoder<Content> {
-  return jsonVisitor(decoders) as JsonDecoder<Content>;
-}
-
-export const jsonBooleanDecoder: JsonDecoder<boolean> = jsonValueByKindDecoder({
+export const jsonBooleanDecoder: JsonDecoder<boolean> = jsonVisitor({
   boolean: (boolean) => boolean,
 });
-export const jsonNumberDecoder: JsonDecoder<number> = jsonValueByKindDecoder({
+export const jsonNumberDecoder: JsonDecoder<number> = jsonVisitor({
   number: (number) => number,
 });
-export const jsonStringDecoder: JsonDecoder<string> = jsonValueByKindDecoder({
+export const jsonStringDecoder: JsonDecoder<string> = jsonVisitor({
   string: (string) => string,
 });
 
-export const jsonArrayDecoder: JsonDecoder<JsonArrayReadonly> =
-  jsonValueByKindDecoder({
-    array: (array) => array,
-  });
-export const jsonObjectDecoder: JsonDecoder<JsonObjectReadonly> =
-  jsonValueByKindDecoder({
-    object: (object) => object,
-  });
-
-export const jsonValueDecoder = jsonValueByKindDecoder<JsonValueReadonly>({
-  null: (value) => value,
-  boolean: (value) => value,
-  number: (value) => value,
-  string: (value) => value,
-  array: (value) => value,
-  object: (value) => value,
+export const jsonArrayDecoder: JsonDecoder<JsonArray> = jsonVisitor({
+  array: (array) => jsonArrayDeepCopy(array),
+});
+export const jsonObjectDecoder: JsonDecoder<JsonObject> = jsonVisitor({
+  object: (object) => jsonObjectDeepCopy(object),
 });
 
-export const jsonValueAsBooleanDecoder: JsonDecoder<boolean> =
-  jsonValueByKindDecoder({
-    boolean: (boolean) => boolean,
-    string: (string) => {
-      if (string === "true") {
-        return true;
-      }
-      if (string == "false") {
-        return false;
-      }
-      jsonThrowWithExpected(`Boolean or "true"/"false"`, string);
-    },
-  });
-export const jsonValueAsNumberDecoder: JsonDecoder<number> =
-  jsonValueByKindDecoder({
-    number: (number) => number,
-    string: (string) => {
-      if (string === "NaN") {
-        return NaN;
-      }
-      if (string === "Infinity") {
-        return Infinity;
-      }
-      if (string === "-Infinity") {
-        return -Infinity;
-      }
-      const number = Number(string);
-      if (isFinite(number)) {
-        return number;
-      }
-      jsonThrowWithExpected(`Number or "NaN"/"Infinity"`, string);
-    },
-  });
+export const jsonValueAsBooleanDecoder: JsonDecoder<boolean> = jsonVisitor({
+  boolean: (boolean) => boolean,
+  string: (string) => {
+    if (string === "true") {
+      return true;
+    }
+    if (string == "false") {
+      return false;
+    }
+    jsonThrowWithExpected(`Boolean or "true"/"false"`, string);
+  },
+});
+
+export const jsonValueAsNumberDecoder: JsonDecoder<number> = jsonVisitor({
+  number: (number) => number,
+  string: (string) => {
+    if (string === "NaN") {
+      return NaN;
+    }
+    if (string === "Infinity") {
+      return Infinity;
+    }
+    if (string === "-Infinity") {
+      return -Infinity;
+    }
+    const number = Number(string);
+    if (isFinite(number)) {
+      return number;
+    }
+    jsonThrowWithExpected(`Number or "NaN"/"Infinity"`, string);
+  },
+});
 
 export function jsonValueAsConstDecoder<
-  const Values extends Array<JsonPrimitive>,
+  const Values extends readonly JsonPrimitive[],
 >(...values: Values): JsonDecoder<Values[number]> {
   return (encoded) => {
     for (const value of values) {
@@ -98,63 +82,47 @@ export function jsonValueAsConstDecoder<
   };
 }
 
-export const jsonValueAsBigIntDecoder: JsonDecoder<bigint> =
-  jsonValueByKindDecoder({
-    number: (number) => BigInt(number),
-    string: (string) => {
-      if (string.includes("_")) {
-        return BigInt(string.replace(/_/g, ""));
-      }
-      return BigInt(string);
-    },
-  });
-
-export const jsonNumberAsUnixDateDecoder: JsonDecoder<Date> =
-  jsonValueByKindDecoder({
-    number: (number) => {
-      const date = new Date(number * 1000);
-      if (isNaN(date.getTime())) {
-        jsonThrowWithExpected(
-          "Date as number of seconds since Unix epoch",
-          number,
-        );
-      }
-      return date;
-    },
-  });
-
-export const jsonStringAsIsoDateDecoder: JsonDecoder<Date> =
-  jsonValueByKindDecoder({
-    string: (string) => {
-      const date = new Date(string);
-      if (isNaN(date.getTime())) {
-        jsonThrowWithExpected("Date in ISO string format", string);
-      }
-      return date;
-    },
-  });
-
-export const jsonStringAsUrlDecoder: JsonDecoder<URL> = jsonValueByKindDecoder({
-  string: (string) => new URL(string),
+export const jsonValueAsBigIntDecoder: JsonDecoder<bigint> = jsonVisitor({
+  number: (number) => BigInt(number),
+  string: (string) => {
+    if (string.includes("_")) {
+      return BigInt(string.replace(/_/g, ""));
+    }
+    return BigInt(string);
+  },
 });
 
-export function jsonStringAsPrefixedDecoder<const Prefix extends string>(
-  prefix: Prefix,
-): JsonDecoder<`${Prefix}${string}`> {
-  return jsonValueByKindDecoder({
-    string: (string) => {
-      if (string.startsWith(prefix)) {
-        return string as `${Prefix}${string}`;
-      }
-      jsonThrowWithExpected(`String starting with "${prefix}"`, string);
-    },
-  });
-}
+export const jsonNumberAsUnixDateDecoder: JsonDecoder<Date> = jsonVisitor({
+  number: (number) => {
+    const date = new Date(number * 1000);
+    if (isNaN(date.getTime())) {
+      jsonThrowWithExpected(
+        "Date as number of seconds since Unix epoch",
+        number,
+      );
+    }
+    return date;
+  },
+});
+
+export const jsonStringAsIsoDateDecoder: JsonDecoder<Date> = jsonVisitor({
+  string: (string) => {
+    const date = new Date(string);
+    if (isNaN(date.getTime())) {
+      jsonThrowWithExpected("Date in ISO string format", string);
+    }
+    return date;
+  },
+});
+
+export const jsonStringAsUrlDecoder: JsonDecoder<URL> = jsonVisitor({
+  string: (string) => new URL(string),
+});
 
 export function jsonNumberAsOpaqueDecoder<
   const Opaque extends JsonNumberOpaque<any>,
 >(): JsonDecoder<Opaque> {
-  return jsonValueByKindDecoder({
+  return jsonVisitor({
     number: (number) => number as Opaque,
   });
 }
@@ -162,15 +130,15 @@ export function jsonNumberAsOpaqueDecoder<
 export function jsonStringAsOpaqueDecoder<
   const Opaque extends JsonStringOpaque<any>,
 >(): JsonDecoder<Opaque> {
-  return jsonValueByKindDecoder({
+  return jsonVisitor({
     string: (string) => string as Opaque,
   });
 }
 
 export function jsonArrayAsItemsDecoder<Item>(
   itemsDecoder: JsonDecoder<Item>,
-): JsonDecoder<Array<Item>> {
-  return jsonValueByKindDecoder({
+): JsonDecoder<Item[]> {
+  return jsonVisitor({
     array: (encoded) => {
       const decoded = new Array<Item>(encoded.length);
       for (let index = 0; index < encoded.length; index++) {
@@ -184,8 +152,8 @@ export function jsonArrayAsItemsDecoder<Item>(
 }
 
 export function jsonArrayAsTupleDecoder<
-  const RequiredItems extends Array<any> = [],
-  const OptionalItems extends Array<any> = [],
+  const RequiredItems extends readonly any[] = [],
+  const OptionalItems extends readonly any[] = [],
 >(
   requiredItemDecoders: {
     readonly [K in keyof RequiredItems]: JsonDecoder<RequiredItems[K]>;
@@ -199,7 +167,7 @@ export function jsonArrayAsTupleDecoder<
     ...{ [K in keyof OptionalItems]?: OptionalItems[K] | undefined },
   ]
 > {
-  return jsonValueByKindDecoder({
+  return jsonVisitor({
     array: (encoded) => {
       const requiredLength = requiredItemDecoders.length;
       if (encoded.length < requiredLength) {
@@ -254,7 +222,7 @@ export function jsonObjectAsValuesDecoder<
       throw new Error(`Key "${key}" cannot be both required and optional`);
     }
   }
-  return jsonValueByKindDecoder({
+  return jsonVisitor({
     object: (encoded) => {
       const decoded = {} as any;
       for (const key in requiredValueDecoders) {
@@ -279,10 +247,11 @@ export function jsonObjectAsValuesDecoder<
     },
   });
 }
+
 export function jsonObjectAsRecordDecoder<Value>(
   valuesDecoder: JsonDecoder<Value>,
 ): JsonDecoder<Record<string, Value>> {
-  return jsonValueByKindDecoder({
+  return jsonVisitor({
     object: (encoded) => {
       const decoded = {} as Record<string, Value>;
       for (const key in encoded) {

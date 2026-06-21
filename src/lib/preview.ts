@@ -1,10 +1,10 @@
-import { type JsonValue, type JsonValueReadonly } from "..";
 import { jsonStringify } from "./stringify";
+import { JsonValueReadonly } from "./types";
 
 /**
- * Returns a short, human-readable preview string of a {@link JsonValue}.
+ * Returns a short, human-readable preview string of a {@link JsonValueReadonly}.
  */
-export function jsonPreview(value: JsonValue | JsonValueReadonly): string {
+export function jsonPreview(value: JsonValueReadonly): string {
   // TODO - better implementation
   const stringified = jsonStringify(value);
   if (stringified.length > 20) {

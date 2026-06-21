@@ -1,12 +1,12 @@
-import { type JsonValue, type JsonValueReadonly } from "..";
 import { jsonPreview } from "./preview";
+import { JsonValueReadonly } from "./types";
 
 /**
- * Throws an error indicating that a {@link JsonValue} did not match the expected type or value.
+ * Throws an error indicating that a {@link JsonValueReadonly} did not match the expected type or value.
  */
 export function jsonThrowWithExpected(
   expected: string,
-  found: JsonValue | JsonValueReadonly,
+  found: JsonValueReadonly,
 ): never {
   throw new Error(`JSON: Expected: ${expected} (Found: ${jsonPreview(found)})`);
 }

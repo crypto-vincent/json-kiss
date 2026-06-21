@@ -1,15 +1,14 @@
-import {
-  type JsonArrayReadonly,
-  type JsonObjectReadonly,
-  type JsonValue,
-  type JsonValueReadonly,
-} from "..";
 import { jsonThrowWithExpected } from "./throw";
+import {
+  JsonArrayReadonly,
+  JsonObjectReadonly,
+  JsonValueReadonly,
+} from "./types";
 
 /**
- * Creates a visitor function for a {@link JsonValue} that dispatches to the appropriate visitor based on the value's type.
+ * Creates a visitor function for a {@link JsonValueReadonly} that dispatches to the appropriate visitor based on the value's type.
  */
-export function jsonVisitor<Context, Returned>(visitors: {
+export function jsonVisitor<Returned, Context = void>(visitors: {
   null?: (value: null, context: Context) => Returned;
   boolean?: (value: boolean, context: Context) => Returned;
   number?: (value: number, context: Context) => Returned;

@@ -1,4 +1,4 @@
-import { type JsonValue } from "..";
+import { JsonValue } from "./types";
 
 /**
  * Parses a JSON string into a {@link JsonValue}.
