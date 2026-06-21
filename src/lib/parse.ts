@@ -5,17 +5,147 @@ import { JsonArray, JsonObject, JsonValue } from "./types";
  * @param string The JSON string to parse.
  * @returns The parsed {@link JsonValue}.
  */
-export function jsonParse(
-  string: string,
-  // config?: { lenient?: boolean },
-): JsonValue {
+export function jsonParse(string: string): JsonValue {
   const reader = new Reader(string);
-  const result = value(reader);
-  whitespace(reader);
-  if (reader.peek(1) !== null) {
-    throw new Error("Unexpected characters after JSON value");
-  }
+  consumeWhitespacesAndComments(reader);
+  const result = consumeValue(reader);
+  consumeWhitespacesAndComments(reader);
+  reader.consumeWhile(() => {
+    return reader.throwContext("Expected end of input");
+  });
   return result;
+}
+
+function consumeValue(reader: Reader): JsonValue {
+  if (reader.consumePrefix("null")) {
+    return null;
+  }
+  if (reader.consumePrefix("true")) {
+    return true;
+  }
+  if (reader.consumePrefix("false")) {
+    return false;
+  }
+  const next = reader.popOrThrow();
+  if (next === `"` || next === `'`) {
+    return consumeString(next, reader);
+  }
+  if (next === `[`) {
+    return consumeArray(reader);
+  }
+  if (next === `{`) {
+    return consumeObject(reader);
+  }
+  return consumeNumber(next, reader);
+}
+
+export function consumeString(quote: string, reader: Reader): string {
+  const parts = new Array<string>();
+  while (true) {
+    const next = reader.popOrThrow();
+    if (next === quote) {
+      return parts.join("");
+    }
+    if (next === "\\") {
+      parts.push(escaped(reader.popOrThrow()));
+    } else {
+      parts.push(next);
+    }
+  }
+}
+
+export function consumeArray(reader: Reader): JsonArray {
+  const array: JsonArray = [];
+  while (true) {
+    consumeWhitespacesAndComments(reader);
+    if (reader.consumePrefix("]")) {
+      return array;
+    }
+    array.push(consumeValue(reader));
+    consumeWhitespacesAndComments(reader);
+    if (reader.consumePrefix("]")) {
+      return array;
+    }
+    if (!reader.consumePrefix(",")) {
+      reader.throwContext("Expected ',' or ']'");
+    }
+  }
+}
+
+export function consumeObject(reader: Reader): JsonObject {
+  const object: JsonObject = {};
+  while (true) {
+    consumeWhitespacesAndComments(reader);
+    if (reader.consumePrefix("}")) {
+      return object;
+    }
+    const next = reader.popOrThrow();
+    let key;
+    if (next === `"` || next === `'`) {
+      key = consumeString(next, reader);
+    } else {
+      key = `${next}${reader.consumeWhile(isIdentifierChar)}`;
+    }
+    consumeWhitespacesAndComments(reader);
+    if (!reader.consumePrefix(":")) {
+      reader.throwContext("Expected ':' after object key");
+    }
+    consumeWhitespacesAndComments(reader);
+    object[key] = consumeValue(reader);
+    consumeWhitespacesAndComments(reader);
+    if (reader.consumePrefix("}")) {
+      return object;
+    }
+    if (!reader.consumePrefix(",")) {
+      reader.throwContext("Expected ',' or '}'");
+    }
+  }
+}
+
+function consumeNumber(head: string, reader: Reader): number {
+  const tail = reader.consumeWhile(isNumberChar);
+  const real = `${head}${tail}`;
+  if (real === "NaN") {
+    return NaN;
+  }
+  const value = Number(real);
+  if (isNaN(value)) {
+    reader.throwContext(`Invalid number: ${real}`);
+  }
+  return value;
+}
+
+function consumeWhitespacesAndComments(reader: Reader) {
+  reader.consumeWhile(isWhitespaceChar);
+  if (reader.consumePrefix("//")) {
+    reader.consumeWhile(isNotLineReturnChar);
+    reader.consumeWhile(isWhitespaceChar);
+  }
+  if (reader.consumePrefix("/*")) {
+    reader.consumeWhile(isEndOfMultilineComment);
+    reader.consumeWhile(isWhitespaceChar);
+  }
+}
+
+function escaped(char: string): string {
+  switch (char) {
+    case `"`:
+      return `"`;
+    case `'`:
+      return `'`;
+    case `\\`:
+      return `\\`;
+    case `n`:
+      return `\n`;
+    case `\n`:
+      return `\n`;
+    case `t`:
+      return `\t`;
+    case `r`:
+      return `\r`;
+    default:
+      throw new Error(`Unexpected escape character: ${char}`);
+  }
 }
 
 class Reader {
@@ -25,196 +155,73 @@ class Reader {
     this.#value = value;
     this.#index = 0;
   }
-  peek(count: number): string | null {
-    if (this.#index + count > this.#value.length) {
-      return null;
+  popOrThrow(): string {
+    if (this.#index >= this.#value.length) {
+      this.throwContext("Unexpected end of input");
     }
-    return this.#value.slice(this.#index, this.#index + count);
+    return this.#value.slice(this.#index, ++this.#index);
   }
-  read(count: number): string | null {
-    if (this.#index + count > this.#value.length) {
-      return null;
-    }
-    const result = this.#value.slice(this.#index, this.#index + count);
-    this.#index += count;
-    return result;
-  }
-}
-
-function value(reader: Reader): JsonValue {
-  whitespace(reader);
-  const peeked = reader.peek(1);
-  if (peeked === null) {
-    throw new Error("Unexpected end of input");
-  }
-  if (peeked === `n`) {
-    return valueNull(reader);
-  }
-  if (peeked === `t` || peeked === `f`) {
-    return valueBoolean(reader);
-  }
-  if (
-    peeked === `-` ||
-    peeked === `+` ||
-    peeked === `.` ||
-    (peeked >= `0` && peeked <= `9`)
-  ) {
-    return valueNumber(reader);
-  }
-  if (peeked === `"` || peeked === `'`) {
-    return valueString(reader);
-  }
-  if (peeked === `[`) {
-    return valueArray(reader);
-  }
-  if (peeked === `{`) {
-    return valueObject(reader);
-  }
-  throw new Error(`Unexpected character "${peeked}"`);
-}
-
-function valueNull(reader: Reader): null {
-  const read = reader.read(4);
-  if (read !== "null") {
-    throw new Error(`Expected "null", but found "${read}"`);
-  }
-  return null;
-}
-
-function valueBoolean(reader: Reader): boolean {
-  const read = reader.read(4);
-  if (read === "true") {
-    return true;
-  }
-  if (read === "fals") {
-    const read2 = reader.read(1);
-    if (read2 !== "e") {
-      throw new Error(`Expected "false", but found "${read}${read2}"`);
+  consumePrefix(prefix: string): boolean {
+    if (this.#value.startsWith(prefix, this.#index)) {
+      this.#index += prefix.length;
+      return true;
     }
     return false;
   }
-  throw new Error(`Expected "true" or "false", but found "${read}"`);
-}
-
-function valueNumber(reader: Reader): number {
-  let numberString = "";
-  let peeked = reader.peek(1);
-  if (peeked === "-" || peeked === "+") {
-    numberString += reader.read(1);
-    peeked = reader.peek(1);
-  }
-  if (peeked === null) {
-    throw new Error("Unexpected end of input");
-  }
-  if (peeked === ".") {
-    numberString += reader.read(1);
-    peeked = reader.peek(1);
-    if (peeked === null) {
-      throw new Error("Unexpected end of input");
-    }
-    if (peeked < "0" || peeked > "9") {
-      throw new Error(`Expected digit, but found "${peeked}"`);
-    }
-    while (peeked !== null && peeked >= "0" && peeked <= "9") {
-      numberString += reader.read(1);
-      peeked = reader.peek(1);
-    }
-  } else if (peeked >= "0" && peeked <= "9") {
-    while (peeked !== null && peeked >= "0" && peeked <= "9") {
-      numberString += reader.read(1);
-      peeked = reader.peek(1);
-    }
-    if (peeked === ".") {
-      numberString += reader.read(1);
-      peeked = reader.peek(1);
-      if (peeked === null) {
-        throw new Error("Unexpected end of input");
+  consumeWhile(predicate: (next: string, reader: Reader) => boolean): string {
+    const start = this.#index;
+    while (this.#index < this.#value.length) {
+      if (!predicate(this.#value[this.#index]!, this)) {
+        break;
       }
-      if (peeked < "0" || peeked > "9") {
-        throw new Error(`Expected digit, but found "${peeked}"`);
-      }
-      while (peeked !== null && peeked >= "0" && peeked <= "9") {
-        numberString += reader.read(1);
-        peeked = reader.peek(1);
-      }
+      this.#index++;
     }
-  } else {
-    throw new Error(`Expected digit or ".", but found "${peeked}"`);
+    return this.#value.slice(start, this.#index);
   }
-  return Number(numberString);
+  throwContext(message: string): never {
+    throw new Error(`JSON parsing error: ${message}`); // TODO - error message with context
+  }
 }
 
-export function valueString(reader: Reader): string {
-  const quote = reader.read(1);
-  if (quote !== `"` && quote !== `'`) {
-    throw new Error(`Expected '"' or "'", but found "${quote}"`);
-  }
-  let string = "";
-  let peeked = reader.peek(1);
-  while (peeked !== null && peeked !== quote) {
-    string += reader.read(1);
-    peeked = reader.peek(1);
-  }
-  if (peeked === null) {
-    throw new Error("Unexpected end of input");
-  }
-  reader.read(1); // consume the closing quote
-  return string;
+function isEndOfMultilineComment(_: string, reader: Reader) {
+  return reader.consumePrefix("*/") === false;
 }
 
-export function valueArray(reader: Reader): JsonArray {
-  const openBracket = reader.read(1);
-  if (openBracket !== "[") {
-    throw new Error(`Expected "[", but found "${openBracket}"`);
-  }
-  const array: JsonArray = [];
-  let peeked = reader.peek(1);
-  while (peeked !== null && peeked !== "]") {
-    array.push(value(reader));
-    peeked = reader.peek(1);
-    if (peeked === ",") {
-      reader.read(1); // consume the comma
-      peeked = reader.peek(1);
-    } else if (peeked !== "]") {
-      throw new Error(`Expected "," or "]", but found "${peeked}"`);
-    }
-  }
-  if (peeked === null) {
-    throw new Error("Unexpected end of input");
-  }
-  reader.read(1); // consume the closing bracket
-  return array;
+function isNotLineReturnChar(value: string) {
+  return value !== "\n" && value !== "\r";
 }
 
-export function valueObject(reader: Reader): JsonObject {
-  const openBrace = reader.read(1);
-  if (openBrace !== "{") {
-    throw new Error(`Expected "{", but found "${openBrace}"`);
-  }
-  const object: JsonObject = {};
-  let peeked = reader.peek(1);
-  while (peeked !== null && peeked !== "}") {
-    const key = valueString(reader);
-    peeked = reader.peek(1);
-    whitespace(reader);
-    if (peeked !== ":") {
-      throw new Error(`Expected ":", but found "${peeked}"`);
-    }
-    reader.read(1); // consume the colon
-    object[key] = value(reader);
-    peeked = reader.peek(1);
-    if (peeked === ",") {
-      reader.read(1); // consume the comma
-      peeked = reader.peek(1);
-    } else if (peeked !== "}") {
-      throw new Error(`Expected "," or "}", but found "${peeked}"`);
-    }
-  }
-  if (peeked === null) {
-    throw new Error("Unexpected end of input");
-  }
-  reader.read(1); // consume the closing brace
-  return object;
+function isNumberChar(value: string) {
+  return numberCharSet.has(value);
 }
 
-function whitespace(reader: Reader) {}
+function isWhitespaceChar(value: string) {
+  // TODO - does this needs to be more accurate ?
+  return whitespaceCharSet.has(value);
+}
+
+function isIdentifierChar(value: string) {
+  if (isWhitespaceChar(value)) {
+    return false;
+  }
+  if (value === ":") {
+    return false;
+  }
+  if (value === ";") {
+    return false;
+  }
+  return true;
+}
+
+const numberCharSet = new Set(
+  [
+    [".", "+", "-", "_"],
+    ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"],
+    ["n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"],
+    ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M"],
+    ["N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
+  ].flat(),
+);
+
+const whitespaceCharSet = new Set(["\n", "\r", "\t", " "]);
