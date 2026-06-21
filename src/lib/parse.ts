@@ -10,7 +10,12 @@ export function jsonParse(
   // config?: { lenient?: boolean },
 ): JsonValue {
   const reader = new Reader(string);
-  return value(reader);
+  const result = value(reader);
+  whitespace(reader);
+  if (reader.peek(1) !== null) {
+    throw new Error("Unexpected characters after JSON value");
+  }
+  return result;
 }
 
 class Reader {
@@ -191,6 +196,7 @@ export function valueObject(reader: Reader): JsonObject {
   while (peeked !== null && peeked !== "}") {
     const key = valueString(reader);
     peeked = reader.peek(1);
+    whitespace(reader);
     if (peeked !== ":") {
       throw new Error(`Expected ":", but found "${peeked}"`);
     }

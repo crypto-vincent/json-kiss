@@ -2,7 +2,6 @@ import { expect, it } from "@jest/globals";
 import { jsonParse, JsonValue } from "../src";
 
 it("run", async () => {
-  // Can you invert the parameters here:
   checkCase(`{"hello":"42"}`, { hello: "42" });
   checkCase(`{"hello":42}`, { hello: 42 });
   checkCase(`{"key":"value"}`, { key: "value" });
@@ -14,9 +13,14 @@ it("run", async () => {
   checkCase(`{"emptyObject":{}}`, { emptyObject: {} });
   checkCase(`{"emptyArray":[]}`, { emptyArray: [] });
   checkCase(`{"mixed":[1,"two",true,null]}`, { mixed: [1, "two", true, null] });
+  checkCase(`{"key":+4.2E+2}`, { key: 420 });
+  checkCase(`{"key":-4.2E-2}`, { key: -0.042 });
   checkCase(`{"specialChars":"\\n\\t\\r"}`, { specialChars: "\n\t\r" });
   checkCase(`{"unicode":"✓"}`, { unicode: "✓" });
   checkCase(`{"escape":"\\\""}`, { escape: '"' });
+  checkCase(`{"nested":{"array":[1,2,3],"object":{"key":"value"}}}`, {
+    nested: { array: [1, 2, 3], object: { key: "value" } },
+  });
 });
 
 function checkCase(input: string, output: JsonValue) {
