@@ -47,7 +47,7 @@ export function consumeString(quote: string, reader: Reader): string {
       return parts.join("");
     }
     if (next === "\\") {
-      parts.push(escaped(reader.popOrThrow()));
+      parts.push(consumeEscaped(reader));
     } else {
       parts.push(next);
     }
@@ -116,35 +116,67 @@ function consumeNumber(head: string, reader: Reader): number {
 }
 
 function consumeWhitespacesAndComments(reader: Reader) {
-  reader.consumeWhile(isWhitespaceChar);
-  if (reader.consumePrefix("//")) {
-    reader.consumeWhile(isNotLineReturnChar);
+  while (true) {
     reader.consumeWhile(isWhitespaceChar);
-  }
-  if (reader.consumePrefix("/*")) {
-    reader.consumeWhile(isEndOfMultilineComment);
-    reader.consumeWhile(isWhitespaceChar);
+    if (reader.consumePrefix("//")) {
+      reader.consumeWhile(isNotLineReturnChar);
+      continue;
+    }
+    if (reader.consumePrefix("/*")) {
+      reader.consumeWhile(isEndOfMultilineComment);
+      continue;
+    }
+    break;
   }
 }
 
-function escaped(char: string): string {
-  switch (char) {
+function consumeEscaped(reader: Reader): string {
+  const prefix = reader.popOrThrow();
+  switch (prefix) {
+    case `\r`:
+      return ``;
+    case `\n`:
+      return ``;
     case `"`:
       return `"`;
     case `'`:
       return `'`;
     case `\\`:
       return `\\`;
+    case `/`:
+      return `/`;
     case `n`:
       return `\n`;
-    case `\n`:
-      return `\n`;
-    case `t`:
-      return `\t`;
     case `r`:
       return `\r`;
+    case `t`:
+      return `\t`;
+    case `b`:
+      return `\b`;
+    case `f`:
+      return `\f`;
+    case "v":
+      return `\v`;
+    case "0":
+      return `\0`;
+    case "x": {
+      const hex = reader.popOrThrow(2);
+      const code = parseInt(hex, 16);
+      if (isNaN(code)) {
+        reader.throwContext(`Invalid hex escape sequence: \\x${hex}`);
+      }
+      return String.fromCharCode(code);
+    }
+    case `u`: {
+      const hex = reader.popOrThrow(4);
+      const code = parseInt(hex, 16);
+      if (isNaN(code)) {
+        reader.throwContext(`Invalid unicode escape sequence: \\u${hex}`);
+      }
+      return String.fromCharCode(code);
+    }
     default:
-      throw new Error(`Unexpected escape character: ${char}`);
+      reader.throwContext(`Unexpected escape character: ${prefix}`);
   }
 }
 
@@ -155,11 +187,13 @@ class Reader {
     this.#value = value;
     this.#index = 0;
   }
-  popOrThrow(): string {
-    if (this.#index >= this.#value.length) {
+  popOrThrow(length: number = 1): string {
+    if (this.#index + length > this.#value.length) {
       this.throwContext("Unexpected end of input");
     }
-    return this.#value.slice(this.#index, ++this.#index);
+    const result = this.#value.slice(this.#index, this.#index + length);
+    this.#index += length;
+    return result;
   }
   consumePrefix(prefix: string): boolean {
     if (this.#value.startsWith(prefix, this.#index)) {
@@ -179,7 +213,15 @@ class Reader {
     return this.#value.slice(start, this.#index);
   }
   throwContext(message: string): never {
-    throw new Error(`JSON parsing error: ${message}`); // TODO - error message with context
+    if (this.#index >= this.#value.length) {
+      throw new Error(
+        `JSON parsing error: ${message}: ${this.#value.slice(this.#index - 20, this.#index)}...`,
+      );
+    } else {
+      throw new Error(
+        `JSON parsing error: ${message}: "${this.#value.slice(this.#index, this.#index + 20)}..."`,
+      ); // TODO - error message with context
+    }
   }
 }
 
@@ -196,7 +238,6 @@ function isNumberChar(value: string) {
 }
 
 function isWhitespaceChar(value: string) {
-  // TODO - does this needs to be more accurate ?
   return whitespaceCharSet.has(value);
 }
 
@@ -224,4 +265,4 @@ const numberCharSet = new Set(
   ].flat(),
 );
 
-const whitespaceCharSet = new Set(["\n", "\r", "\t", " "]);
+const whitespaceCharSet = new Set([" ", "\n", "\r", "\t", "\v", "\f"]);

@@ -14,8 +14,18 @@ it("run", async () => {
   checkCompactCase({ emptyArray: [] }, `{"emptyArray":[]}`);
   checkCompactCase({ m: [1, "two", true, null] }, `{"m":[1,"two",true,null]}`);
   checkCompactCase({ specialChars: "\n\t\r" }, `{"specialChars":"\\n\\t\\r"}`);
-  checkCompactCase({ unicode: "✓" }, `{"unicode":"✓"}`);
+  checkCompactCase({ unicode: "✓😀" }, `{"unicode":"✓😀"}`);
+  checkCompactCase({ unicode: "\uD83D\uDE00" }, `{"unicode":"😀"}`);
   checkCompactCase({ escape: '"' }, `{"escape":"\\\""}`);
+  checkCompactCase({ escape: "\\" }, `{"escape":"\\\\"}`);
+  checkCompactCase({ escape: "/" }, `{"escape":"/"}`);
+  checkCompactCase({ escape: "\b" }, `{"escape":"\\b"}`);
+  checkCompactCase({ escape: "\f" }, `{"escape":"\\f"}`);
+  checkCompactCase({ escape: "\n" }, `{"escape":"\\n"}`);
+  checkCompactCase({ escape: "\r" }, `{"escape":"\\r"}`);
+  checkCompactCase({ escape: "\t" }, `{"escape":"\\t"}`);
+  checkCompactCase({ escape: "\0" }, `{"escape":"\\u0000"}`);
+  checkCompactCase({ escape: "\x1B" }, `{"escape":"\\u001b"}`);
 });
 
 function checkCompactCase(value: JsonValue, output: string) {
