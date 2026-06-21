@@ -5,7 +5,13 @@ import { JsonArray, JsonObject, JsonValue } from "./types";
  * @param string The JSON string to parse.
  * @returns The parsed {@link JsonValue}.
  */
-export function jsonParse(string: string): JsonValue {
+export function jsonParse(
+  string: string,
+  config?: { strict?: boolean },
+): JsonValue {
+  if (config?.strict) {
+    return JSON.parse(string) as JsonValue;
+  }
   const reader = new Reader(string);
   consumeWhitespacesAndComments(reader);
   const result = consumeValue(reader);
@@ -26,7 +32,7 @@ function consumeValue(reader: Reader): JsonValue {
   if (reader.consumePrefix("false")) {
     return false;
   }
-  const next = reader.popOrThrow();
+  const next = reader.popOrThrow(1);
   if (next === `"` || next === `'`) {
     return consumeString(next, reader);
   }
@@ -42,12 +48,12 @@ function consumeValue(reader: Reader): JsonValue {
 export function consumeString(quote: string, reader: Reader): string {
   const parts = new Array<string>();
   while (true) {
-    const next = reader.popOrThrow();
+    const next = reader.popOrThrow(1);
     if (next === quote) {
       return parts.join("");
     }
     if (next === "\\") {
-      parts.push(consumeEscaped(reader));
+      parts.push(consumeEscapedChar(reader));
     } else {
       parts.push(next);
     }
@@ -79,7 +85,7 @@ export function consumeObject(reader: Reader): JsonObject {
     if (reader.consumePrefix("}")) {
       return object;
     }
-    const next = reader.popOrThrow();
+    const next = reader.popOrThrow(1);
     let key;
     if (next === `"` || next === `'`) {
       key = consumeString(next, reader);
@@ -115,23 +121,8 @@ function consumeNumber(head: string, reader: Reader): number {
   return value;
 }
 
-function consumeWhitespacesAndComments(reader: Reader) {
-  while (true) {
-    reader.consumeWhile(isWhitespaceChar);
-    if (reader.consumePrefix("//")) {
-      reader.consumeWhile(isNotLineReturnChar);
-      continue;
-    }
-    if (reader.consumePrefix("/*")) {
-      reader.consumeWhile(isEndOfMultilineComment);
-      continue;
-    }
-    break;
-  }
-}
-
-function consumeEscaped(reader: Reader): string {
-  const prefix = reader.popOrThrow();
+function consumeEscapedChar(reader: Reader): string {
+  const prefix = reader.popOrThrow(1);
   switch (prefix) {
     case `\r`:
       return ``;
@@ -180,6 +171,21 @@ function consumeEscaped(reader: Reader): string {
   }
 }
 
+function consumeWhitespacesAndComments(reader: Reader) {
+  while (true) {
+    reader.consumeWhile(isWhitespaceChar);
+    if (reader.consumePrefix("//")) {
+      reader.consumeWhile(isNotLineReturnChar);
+      continue;
+    }
+    if (reader.consumePrefix("/*")) {
+      reader.consumeWhile(isEndOfMultilineComment);
+      continue;
+    }
+    break;
+  }
+}
+
 class Reader {
   #value: string;
   #index: number;
@@ -187,7 +193,7 @@ class Reader {
     this.#value = value;
     this.#index = 0;
   }
-  popOrThrow(length: number = 1): string {
+  popOrThrow(length: number): string {
     if (this.#index + length > this.#value.length) {
       this.throwContext("Unexpected end of input");
     }
