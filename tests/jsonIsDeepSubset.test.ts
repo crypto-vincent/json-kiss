@@ -68,6 +68,16 @@ it("run", async () => {
     isDeepSubset: false,
   });
   checkCase({
+    subset: { key: undefined },
+    superset: {},
+    isDeepSubset: true,
+  });
+  checkCase({
+    subset: {},
+    superset: { key: undefined },
+    isDeepSubset: true,
+  });
+  checkCase({
     subset: { toString: undefined },
     superset: {},
     isDeepSubset: true,
