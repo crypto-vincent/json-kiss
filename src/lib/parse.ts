@@ -226,7 +226,7 @@ class Reader {
     } else {
       throw new Error(
         `JSON parsing error: ${message}: "${this.#value.slice(this.#index, this.#index + 20)}..."`,
-      ); // TODO - error message with context
+      ); // TODO - better error message with context
     }
   }
 }
