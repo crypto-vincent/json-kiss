@@ -1,5 +1,5 @@
 import { expect, it } from "@jest/globals";
-import { jsonIsDeepEqual, JsonValue } from "../src";
+import { jsonIsDeepEqual, JsonValueReadonly } from "../src";
 
 it("run", async () => {
   checkCase({
@@ -67,11 +67,31 @@ it("run", async () => {
     b: [1, [1], { key: "value" }],
     isDeepEqual: false,
   });
+  checkCase({
+    a: { key: undefined },
+    b: {},
+    isDeepEqual: true,
+  });
+  checkCase({
+    a: {},
+    b: { key: undefined },
+    isDeepEqual: true,
+  });
+  checkCase({
+    a: { toString: undefined },
+    b: {},
+    isDeepEqual: true,
+  });
+  checkCase({
+    a: {},
+    b: { toString: undefined },
+    isDeepEqual: true,
+  });
 });
 
 function checkCase(params: {
-  a: JsonValue;
-  b: JsonValue;
+  a: JsonValueReadonly;
+  b: JsonValueReadonly;
   isDeepEqual: boolean;
 }) {
   expect(params.isDeepEqual).toStrictEqual(jsonIsDeepEqual(params.a, params.b));

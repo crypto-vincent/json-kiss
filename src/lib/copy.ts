@@ -14,8 +14,7 @@ export function jsonArrayDeepCopy(array: JsonArrayReadonly): JsonArray {
 
 export function jsonObjectDeepCopy(object: JsonObjectReadonly): JsonObject {
   const copy: JsonObject = {};
-  for (const objectKey in object) {
-    const objectValue = object[objectKey];
+  for (const [objectKey, objectValue] of Object.entries(object)) {
     if (objectValue !== undefined) {
       copy[objectKey] = jsonValueDeepCopy(objectValue);
     }

@@ -1,5 +1,5 @@
 import { expect, it } from "@jest/globals";
-import { jsonStringify, JsonValue } from "../src";
+import { jsonStringify, JsonValueReadonly } from "../src";
 
 it("run", async () => {
   checkCompactCase({ hello: "42" }, `{"hello":"42"}`);
@@ -28,6 +28,6 @@ it("run", async () => {
   checkCompactCase({ escape: "\x1B" }, `{"escape":"\\u001b"}`);
 });
 
-function checkCompactCase(value: JsonValue, output: string) {
+function checkCompactCase(value: JsonValueReadonly, output: string) {
   expect(jsonStringify(value)).toStrictEqual(output);
 }

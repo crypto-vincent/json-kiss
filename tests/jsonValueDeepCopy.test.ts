@@ -1,5 +1,5 @@
 import { expect, it } from "@jest/globals";
-import { JsonValue } from "../src";
+import { JsonValueReadonly } from "../src";
 import { jsonValueDeepCopy } from "../src/lib/copy";
 
 it("run", async () => {
@@ -13,6 +13,6 @@ it("run", async () => {
   checkRoundTrip({ emptyArray: [] });
 });
 
-function checkRoundTrip(value: JsonValue) {
+function checkRoundTrip(value: JsonValueReadonly) {
   expect(jsonValueDeepCopy(value)).toStrictEqual(value);
 }

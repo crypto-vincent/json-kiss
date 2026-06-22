@@ -55,17 +55,11 @@ export const jsonValueAsNumberDecoder: JsonDecoder<number> = jsonVisitor({
     if (string === "NaN") {
       return NaN;
     }
-    if (string === "Infinity") {
-      return Infinity;
-    }
-    if (string === "-Infinity") {
-      return -Infinity;
-    }
     const number = Number(string);
-    if (isFinite(number)) {
+    if (!isNaN(number)) {
       return number;
     }
-    jsonThrowWithExpected(`Number or "NaN"/"Infinity"`, string);
+    jsonThrowWithExpected(`Number or numeric string`, string);
   },
 });
 
@@ -119,9 +113,7 @@ export const jsonNumberAsUnixDateDecoder: JsonDecoder<Date> = jsonVisitor({
 export function jsonNumberAsOpaqueDecoder<
   const Opaque extends JsonNumberOpaque<any>,
 >(): JsonDecoder<Opaque> {
-  return jsonVisitor({
-    number: (number) => number as Opaque,
-  });
+  return jsonVisitor({ number: (number) => number as Opaque });
 }
 
 export const jsonStringAsIsoDateDecoder: JsonDecoder<Date> = jsonVisitor({
@@ -141,9 +133,7 @@ export const jsonStringAsUrlDecoder: JsonDecoder<URL> = jsonVisitor({
 export function jsonStringAsOpaqueDecoder<
   const Opaque extends JsonStringOpaque<any>,
 >(): JsonDecoder<Opaque> {
-  return jsonVisitor({
-    string: (string) => string as Opaque,
-  });
+  return jsonVisitor({ string: (string) => string as Opaque });
 }
 
 export function jsonArrayAsItemsDecoder<Item>(
@@ -182,10 +172,7 @@ export function jsonArrayAsTupleDecoder<
     array: (encoded) => {
       const requiredLength = requiredItemDecoders.length;
       if (encoded.length < requiredLength) {
-        jsonThrowWithExpected(
-          `Array of at least ${requiredLength} items`,
-          encoded,
-        );
+        jsonThrowWithExpected(`Array with >${requiredLength} items`, encoded);
       }
       const decoded = new Array(encoded.length) as any;
       let position = 0;
@@ -228,24 +215,36 @@ export function jsonObjectAsValuesDecoder<
         [K in keyof OptionalValues]?: OptionalValues[K];
       }
 > {
-  for (const key in requiredValueDecoders) {
-    if (optionalValueDecoders[key] !== undefined) {
-      throw new Error(`Key "${key}" cannot be both required and optional`);
+  const requiredKeys = Object.keys(requiredValueDecoders);
+  const optionalKeys = Object.keys(optionalValueDecoders);
+  for (const key of requiredKeys) {
+    if (!Object.hasOwn(optionalValueDecoders, key)) {
+      continue;
     }
+    if (optionalValueDecoders[key] === undefined) {
+      continue;
+    }
+    throw new Error(`Key "${key}" cannot be both required and optional`);
   }
   return jsonVisitor({
     object: (encoded) => {
       const decoded = {} as any;
-      for (const key in requiredValueDecoders) {
+      for (const key of requiredKeys) {
+        if (!Object.hasOwn(encoded, key)) {
+          jsonThrowWithExpected(`Object with key "${key}"`, encoded);
+        }
         const valueEncoded = encoded[key];
         if (valueEncoded === undefined) {
-          jsonThrowWithExpected(`Object with required key "${key}"`, encoded);
+          jsonThrowWithExpected(`Object with key "${key}"`, encoded);
         }
         const valueDecoder = requiredValueDecoders[key]!;
         const valueDecoded = internalScoped(key, valueEncoded, valueDecoder);
         decoded[key] = valueDecoded;
       }
-      for (const key in optionalValueDecoders) {
+      for (const key of optionalKeys) {
+        if (!Object.hasOwn(encoded, key)) {
+          continue;
+        }
         const valueEncoded = encoded[key];
         if (valueEncoded === undefined) {
           continue;
@@ -266,7 +265,13 @@ export function jsonObjectAsRecordDecoder<Value>(
     object: (encoded) => {
       const decoded = {} as Record<string, Value>;
       for (const key in encoded) {
-        const valueEncoded = encoded[key]!;
+        if (!Object.hasOwn(encoded, key)) {
+          continue;
+        }
+        const valueEncoded = encoded[key];
+        if (valueEncoded === undefined) {
+          continue;
+        }
         const valueDecoded = internalScoped(key, valueEncoded, valuesDecoder);
         decoded[key] = valueDecoded;
       }

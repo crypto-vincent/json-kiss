@@ -134,7 +134,7 @@ export const jsonStringAsIsoDateCodec: JsonCodec<Date> = {
 
 export const jsonStringAsUrlCodec: JsonCodec<URL> = {
   decoder: jsonStringAsUrlDecoder,
-  encoder: (decoded) => decoded.toString(),
+  encoder: (decoded) => decoded.href,
 };
 
 export function jsonStringAsOpaqueCodec<
@@ -218,17 +218,23 @@ export function jsonObjectAsValuesCodec<
         [K in keyof OptionalValues]?: OptionalValues[K];
       }
 > {
-  for (const key in requiredValueCodecs) {
-    if (optionalValueCodecs[key] !== undefined) {
-      throw new Error(`Key "${key}" cannot be both required and optional`);
+  const requiredKeys = Object.keys(requiredValueCodecs);
+  const optionalKeys = Object.keys(optionalValueCodecs);
+  for (const key of requiredKeys) {
+    if (!Object.hasOwn(optionalValueCodecs, key)) {
+      continue;
     }
+    if (optionalValueCodecs[key] === undefined) {
+      continue;
+    }
+    throw new Error(`Key "${key}" cannot be both required and optional`);
   }
   const requiredValueDecoders = {} as any;
-  for (const key in requiredValueCodecs) {
+  for (const key of requiredKeys) {
     requiredValueDecoders[key] = requiredValueCodecs[key]!.decoder;
   }
   const optionalValueDecoders = {} as any;
-  for (const key in optionalValueCodecs) {
+  for (const key of optionalKeys) {
     optionalValueDecoders[key] = optionalValueCodecs[key]!.decoder;
   }
   return {
@@ -238,13 +244,16 @@ export function jsonObjectAsValuesCodec<
     ) as any,
     encoder: (decoded) => {
       const encoded = {} as { [key: string]: JsonValue };
-      for (const key in requiredValueCodecs) {
+      for (const key of requiredKeys) {
         const valueDecoded = decoded[key];
         const valueEncoder = requiredValueCodecs[key]!.encoder;
         const valueEncoded = valueEncoder(valueDecoded as any);
         encoded[key] = valueEncoded;
       }
-      for (const key in optionalValueCodecs) {
+      for (const key of optionalKeys) {
+        if (!Object.hasOwn(decoded, key)) {
+          continue;
+        }
         const valueDecoded = decoded[key];
         if (valueDecoded === undefined) {
           continue;
@@ -267,7 +276,13 @@ export function jsonObjectAsRecordCodec<Value>(
     encoder: (decoded) => {
       const encoded = {} as { [key: string]: JsonValue };
       for (const key in decoded) {
-        const valueDecoded = decoded[key]!;
+        if (!Object.hasOwn(decoded, key)) {
+          continue;
+        }
+        const valueDecoded = decoded[key];
+        if (valueDecoded === undefined) {
+          continue;
+        }
         const valueEncoded = valueEncoder(valueDecoded);
         encoded[key] = valueEncoded;
       }

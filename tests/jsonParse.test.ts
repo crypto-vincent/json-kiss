@@ -1,5 +1,5 @@
 import { expect, it } from "@jest/globals";
-import { jsonParse, JsonValue } from "../src";
+import { jsonParse, JsonValueReadonly } from "../src";
 
 const dummyCases = {
   "null": null,
@@ -65,6 +65,6 @@ it("run", async () => {
   );
 });
 
-function checkCase(input: string, output: JsonValue) {
-  expect(jsonParse(input)).toStrictEqual(output);
+function checkCase(input: string, output: JsonValueReadonly) {
+  expect(jsonParse(input, { allowLenientSyntax: true })).toStrictEqual(output);
 }

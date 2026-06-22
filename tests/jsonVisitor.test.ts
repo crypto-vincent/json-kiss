@@ -1,5 +1,5 @@
 import { expect, it } from "@jest/globals";
-import { JsonValue, jsonVisitor } from "../src";
+import { JsonValueReadonly, jsonVisitor } from "../src";
 
 it("run", async () => {
   checkCase(true, `boolean:true`);
@@ -10,7 +10,7 @@ it("run", async () => {
   checkCase({ key: "value", another: 42 }, `object:{key:value,another:42}`);
 });
 
-function checkCase(input: JsonValue, output: string) {
+function checkCase(input: JsonValueReadonly, output: string) {
   expect(visitor(input, undefined)).toStrictEqual(output);
 }
 

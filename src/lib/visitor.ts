@@ -6,7 +6,8 @@ import {
 } from "./types";
 
 /**
- * Creates a visitor function for a {@link JsonValueReadonly} that dispatches to the appropriate visitor based on the value's type.
+ * Creates a visitor function for a {@link JsonValueReadonly}.
+ * Dispatches to the appropriate visitor based on the value's type.
  */
 export function jsonVisitor<Returned, Context = void>(visitors: {
   null?: (value: null, context: Context) => Returned;
