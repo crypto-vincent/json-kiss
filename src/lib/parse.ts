@@ -179,7 +179,7 @@ function consumeWhitespacesAndComments(reader: Reader) {
       continue;
     }
     if (reader.consumePrefix("/*")) {
-      reader.consumeWhile(isEndOfMultilineComment);
+      reader.consumeWhile(hasNotConsumedMultilineComment);
       continue;
     }
     break;
@@ -219,19 +219,11 @@ class Reader {
     return this.#value.slice(start, this.#index);
   }
   throwContext(message: string): never {
-    if (this.#index >= this.#value.length) {
-      throw new Error(
-        `JSON parsing error: ${message}: ${this.#value.slice(this.#index - 20, this.#index)}...`,
-      );
-    } else {
-      throw new Error(
-        `JSON parsing error: ${message}: "${this.#value.slice(this.#index, this.#index + 20)}..."`,
-      ); // TODO - better error message with context
-    }
+    throw new Error(`JSON error: ${message}: at position ${this.#index}`);
   }
 }
 
-function isEndOfMultilineComment(_: string, reader: Reader) {
+function hasNotConsumedMultilineComment(_: string, reader: Reader) {
   return reader.consumePrefix("*/") === false;
 }
 

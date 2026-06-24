@@ -34,10 +34,9 @@ import {
   JsonPrimitive,
   JsonStringOpaque,
   JsonValue,
-  JsonValueReadonly,
 } from "./types";
 
-export const jsonValueCodec: JsonCodec<JsonValueReadonly> = {
+export const jsonValueCodec: JsonCodec<JsonValue> = {
   decoder: jsonValueDecoder,
   encoder: jsonValueDeepCopy,
 };
@@ -206,6 +205,7 @@ export function jsonObjectAsValuesCodec<
   requiredValueCodecs: {
     [K in keyof RequiredValues]: JsonCodec<RequiredValues[K]>;
   },
+  // TODO - should this be an object input ?
   optionalValueCodecs: {
     [K in keyof OptionalValues]: JsonCodec<OptionalValues[K]>;
   } = {} as any,
